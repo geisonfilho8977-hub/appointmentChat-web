@@ -1,0 +1,15 @@
+services:
+  - type: static
+    name: appointmentchat-web
+    branch: main
+    autoDeploy: true
+    buildCommand: >
+      cd web &&
+      npm ci &&
+      npm run build &&
+      cp dist/main.js public/main.js
+    publishCommand: ""
+    publishDir: web/public
+    headers: []
+    envVars: []
+

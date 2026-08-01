@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>⚕️ Galeno — Entrar</title>
+    <meta name="description" content="Galeno — simulador de consultas médicas. Entre com suas credenciais para acessar a plataforma.">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: auto;
+            background: linear-gradient(135deg, #fef2f2 0%, #fecaca 40%, #fef2f2 100%);
+        }
+
+        .login-page {
+            width: 100%;
+            max-width: 420px;
+            padding: 1.5rem;
+        }
+
+        /* ── Logo / Brand ── */
+        .login-brand {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        .login-brand__icon {
+            width: 72px;
+            height: 72px;
+            background: linear-gradient(135deg, var(--color-primary-light), var(--color-primary-dark));
+            border-radius: var(--radius-2xl);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 8px 24px rgba(220, 38, 38, 0.35);
+            margin-bottom: 1rem;
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50%       { transform: translateY(-8px); }
+        }
+
+        .login-brand__name {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--color-gray-900);
+            letter-spacing: -0.03em;
+        }
+
+        .login-brand__tagline {
+            font-size: 0.9rem;
+            color: var(--color-gray-500);
+            margin-top: 0.25rem;
+        }
+
+        /* ── Card ── */
+        .login-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(12px);
+            border-radius: var(--radius-2xl);
+            box-shadow: 0 20px 60px rgba(0,0,0,0.12), 0 4px 16px rgba(220,38,38,0.08);
+            padding: 2.25rem 2rem;
+            border: 1px solid rgba(255,255,255,0.8);
+            animation: slideUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(24px) scale(0.97); }
+            to   { opacity: 1; transform: translateY(0)    scale(1); }
+        }
+
+        .login-card__title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--color-gray-900);
+            margin-bottom: 0.25rem;
+        }
+
+        .login-card__subtitle {
+            font-size: 0.875rem;
+            color: var(--color-gray-500);
+            margin-bottom: 1.75rem;
+        }
+
+        /* ── Form ── */
+        .login-field {
+            margin-bottom: 1.125rem;
+        }
+
+        .login-label {
+            display: block;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            color: var(--color-gray-700);
+            margin-bottom: 0.4rem;
+            letter-spacing: 0.01em;
+        }
+
+        .login-input-wrap {
+            position: relative;
+        }
+
+        .login-input-icon {
+            position: absolute;
+            left: 0.875rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--color-gray-400);
+            pointer-events: none;
+            display: flex;
+        }
+
+        .login-input {
+            width: 100%;
+            padding: 0.75rem 0.875rem 0.75rem 2.625rem;
+            border: 1.5px solid var(--color-gray-200);
+            border-radius: var(--radius-lg);
+            font-size: 0.9375rem;
+            font-family: inherit;
+            color: var(--color-gray-900);
+            background: var(--color-gray-50);
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+        }
+
+        .login-input:focus {
+            border-color: var(--color-primary);
+            background: #fff;
+            box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.1);
+        }
+
+        .login-input::placeholder { color: var(--color-gray-400); }
+
+        /* ── Error ── */
+        .login-error {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #dc2626;
+            border-radius: var(--radius-md);
+            padding: 0.7rem 0.875rem;
+            font-size: 0.8375rem;
+            font-weight: 500;
+            margin-bottom: 1rem;
+            animation: shake 0.35s ease;
+            display: none;
+        }
+
+        .login-error.visible { display: flex; }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25%       { transform: translateX(-6px); }
+            75%       { transform: translateX(6px); }
+        }
+
+        /* ── Button ── */
+        .login-btn {
+            width: 100%;
+            padding: 0.875rem;
+            background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
+            color: #fff;
+            border: none;
+            border-radius: var(--radius-lg);
+            font-size: 1rem;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 16px rgba(220, 38, 38, 0.3);
+            margin-top: 0.5rem;
+            letter-spacing: 0.01em;
+        }
+
+        .login-btn:hover:not(:disabled) {
+            background: linear-gradient(135deg, var(--color-primary-dark) 0%, #991b1b 100%);
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(220, 38, 38, 0.38);
+        }
+
+        .login-btn:active:not(:disabled) { transform: translateY(0); }
+
+        .login-btn:disabled {
+            opacity: 0.65;
+            cursor: not-allowed;
+        }
+
+        .login-btn__spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255,255,255,0.4);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+            vertical-align: middle;
+            margin-right: 6px;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ── Footer note ── */
+        .login-note {
+            text-align: center;
+            font-size: 0.8rem;
+            color: var(--color-gray-400);
+            margin-top: 1.5rem;
+        }
+
+        .login-admin-wrap {
+            margin-top: 1rem;
+            text-align: center;
+            border-top: 1px solid var(--color-gray-200);
+            padding-top: 1rem;
+        }
+
+        .login-admin-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.8125rem;
+            font-weight: 500;
+            color: var(--color-gray-600);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .login-admin-link:hover {
+            color: var(--color-primary);
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-page">
+        <!-- Brand -->
+        <div class="login-brand">
+            <div class="login-brand__icon">
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
+                    <path d="M12 2V22M2 12H22" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+                </svg>
+            </div>
+            <h1 class="login-brand__name">Galeno</h1>
+            <p class="login-brand__tagline">Simulador de consultas médicas</p>
+        </div>
+
+        <!-- Card de login -->
+        <div class="login-card">
+            <h2 class="login-card__title">Bem-vindo de volta</h2>
+            <p class="login-card__subtitle">Entre com suas credenciais para continuar</p>
+
+            <div class="login-error" id="login-error" role="alert">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+                <span id="login-error-text">Login ou senha incorretos.</span>
+            </div>
+
+            <form id="login-form" autocomplete="off" novalidate>
+                <div class="login-field">
+                    <label class="login-label" for="login-input">Login</label>
+                    <div class="login-input-wrap">
+                        <span class="login-input-icon">
+                            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                                <circle cx="12" cy="7" r="4"/>
+                            </svg>
+                        </span>
+                        <input
+                            type="text"
+                            id="login-input"
+                            class="login-input"
+                            placeholder="Seu login ou e-mail"
+                            autocomplete="username"
+                            required
+                        />
+                    </div>
+                </div>
+
+                <div class="login-field">
+                    <label class="login-label" for="password-input">Senha</label>
+                    <div class="login-input-wrap">
+                        <span class="login-input-icon">
+                            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                            </svg>
+                        </span>
+                        <input
+                            type="password"
+                            id="password-input"
+                            class="login-input"
+                            placeholder="Sua senha"
+                            autocomplete="current-password"
+                            required
+                        />
+                    </div>
+                </div>
+
+                <button type="submit" class="login-btn" id="login-btn">
+                    Entrar
+                </button>
+            </form>
+
+            <p class="login-note">
+                Acesso somente para alunos cadastrados pelo administrador.
+            </p>
+
+            <div class="login-admin-wrap">
+                <a href="/admin.html" class="login-admin-link">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                    </svg>
+                    Painel Administrativo (Cadastro de Alunos)
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Script inline mínimo — sem depender do bundle compilado
+        (function () {
+            const BACKEND = '/api/admin/login';
+
+            const form      = document.getElementById('login-form');
+            const loginInp  = document.getElementById('login-input');
+            const passInp   = document.getElementById('password-input');
+            const btn       = document.getElementById('login-btn');
+            const errBox    = document.getElementById('login-error');
+            const errText   = document.getElementById('login-error-text');
+
+            function showError(msg) {
+                errText.textContent = msg;
+                errBox.classList.add('visible');
+            }
+
+            function hideError() {
+                errBox.classList.remove('visible');
+            }
+
+            function setLoading(loading) {
+                btn.disabled = loading;
+                btn.innerHTML = loading
+                    ? '<span class="login-btn__spinner"></span> Entrando…'
+                    : 'Entrar';
+            }
+
+            form.addEventListener('submit', async function (e) {
+                e.preventDefault();
+                hideError();
+
+                const loginVal = loginInp.value.trim();
+                const passVal  = passInp.value;
+
+                if (!loginVal || !passVal) {
+                    showError('Preencha login e senha.');
+                    return;
+                }
+
+                setLoading(true);
+
+                try {
+                    const res = await fetch(BACKEND, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ login: loginVal, password: passVal }),
+                    });
+
+                    if (!res.ok) {
+                        const data = await res.json().catch(() => ({}));
+                        showError(data.detail || 'Login ou senha incorretos.');
+                        return;
+                    }
+
+                    const data = await res.json();
+                    // Salva sessão de usuário
+                    sessionStorage.setItem('galeno_user', JSON.stringify({
+                        login: data.login,
+                        name: data.name,
+                    }));
+
+                    // Redireciona para o chat
+                    window.location.href = '/index.html';
+                } catch (err) {
+                    showError('Não foi possível conectar ao servidor.');
+                } finally {
+                    setLoading(false);
+                }
+            });
+        })();
+    </script>
+</body>
+</html>

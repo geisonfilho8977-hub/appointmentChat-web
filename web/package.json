@@ -1,0 +1,14 @@
+{
+  "name": "appointment-chat-web",
+  "version": "1.0.0",
+  "devDependencies": {
+    "http-proxy-middleware": "^3.0.5",
+    "lite-server": "^2.6.1",
+    "typescript": "^5.9.3"
+  },
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "start": "npm run build && lite-server --config bs-config.js"
+  }
+}
