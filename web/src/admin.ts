@@ -10,6 +10,7 @@ interface Student {
     name: string;
     login: string;
     created_at: string;
+    tokens?: number;
 }
 
 // ─── DOM refs ────────────────────────────────────────────────────────────────
@@ -89,8 +90,16 @@ async function loadStudents() {
     emptyEl.style.display   = "none";
 
     try {
-        const list = await api<Student[]>("GET", "/students");
-        renderTable(list);
+        const [list, tokenUsage] = await Promise.all([
+            api<Student[]>("GET", "/students"),
+            api<Record<string, number>>("GET", "/students/tokens").catch(() => ({} as Record<string, number>)),
+        ]);
+        // Mescla tokens na lista
+        const listWithTokens = list.map(s => ({
+            ...s,
+            tokens: tokenUsage[s.login.toLowerCase()] ?? 0,
+        }));
+        renderTable(listWithTokens);
     } catch (e: unknown) {
         showToast(e instanceof Error ? e.message : "Erro ao carregar alunos.", "err");
     } finally {
@@ -116,11 +125,13 @@ function renderTable(list: Student[]) {
         const date = new Date(s.created_at).toLocaleDateString("pt-BR", {
             day: "2-digit", month: "short", year: "numeric"
         });
+        const tokens = s.tokens ?? 0;
         const tr = document.createElement("tr");
         tr.innerHTML = `
             <td class="td-name">${esc(s.name)}</td>
             <td class="td-login">${esc(s.login)}</td>
             <td class="td-date">${date}</td>
+            <td class="td-tokens"><span class="token-badge">🔢 ${tokens.toLocaleString("pt-BR")}</span></td>
             <td class="td-actions">
                 <button class="btn-remove" data-id="${s.id}" data-name="${esc(s.name)}">Remover</button>
             </td>`;
@@ -202,6 +213,7 @@ fPass.addEventListener("keydown", e => { if (e.key === "Enter") addStudent(); })
 logoutBtn.addEventListener("click", () => {
     adminKey = "";
     sessionStorage.removeItem("galeno_admin_key");
+    keyInput.value = "";
     showAuth();
 });
 

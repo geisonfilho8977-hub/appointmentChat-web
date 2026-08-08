@@ -11,8 +11,9 @@ if (!_userRaw) {
 const _currentUser: { login: string; name: string } = JSON.parse(_userRaw);
 
 // ─── Constants ───────────────────────────────────────────────────────────────
-const BACKEND_CHAT_URL    = "/api/chat/chat";
-const BACKEND_SESSION_URL = "/api/chat/sessions";
+const BACKEND_CHAT_URL            = "/api/chat/chat";
+const BACKEND_SESSION_URL         = "/api/chat/sessions";
+const BACKEND_CHANGE_PASSWORD_URL = "/api/admin/change-password";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type ChatRole = "user" | "assistant";
@@ -27,6 +28,7 @@ interface SavedChat {
     history: Array<{ role: string; message: string; timestamp: string }>;
     created_at: string;
     updated_at: string;
+    user_login?: string;
 }
 
 // ─── SVG icons ────────────────────────────────────────────────────────────────
@@ -55,6 +57,11 @@ const trashIconSVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24
   <path d="M9 6V4h6v2"/>
 </svg>`;
 
+const editIconSVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13">
+  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+</svg>`;
+
 // ─── DOM refs ─────────────────────────────────────────────────────────────────
 const chatContainer    = document.getElementById("chat-container")!;
 const chatInput        = document.getElementById("chat-input") as HTMLInputElement;
@@ -68,6 +75,22 @@ const sidebar          = document.getElementById("sidebar")!;
 const sidebarToggle    = document.getElementById("sidebar-toggle")!;
 const sidebarOverlay   = document.getElementById("sidebar-overlay")!;
 const toast            = document.getElementById("app-toast")!;
+
+// Modal de alteração de senha DOM refs
+const changePasswordModal  = document.getElementById("change-password-modal") as HTMLElement | null;
+const changePasswordForm   = document.getElementById("change-password-form") as HTMLFormElement | null;
+const closePasswordModal   = document.getElementById("close-password-modal");
+const cancelPasswordModal  = document.getElementById("cancel-password-modal");
+const oldPasswordInput     = document.getElementById("old-password") as HTMLInputElement | null;
+const newPasswordInput     = document.getElementById("new-password") as HTMLInputElement | null;
+const confirmPasswordInput = document.getElementById("confirm-password") as HTMLInputElement | null;
+
+// Modal de confirmação de salvamento DOM refs
+const saveConfirmModal      = document.getElementById("save-confirm-modal") as HTMLElement | null;
+const closeSaveConfirmModal  = document.getElementById("close-save-confirm-modal");
+const cancelSaveConfirmModal = document.getElementById("cancel-save-confirm-modal");
+const confirmSaveBtn        = document.getElementById("confirm-save-btn");
+const dontShowSaveWarningCb = document.getElementById("dont-show-save-warning") as HTMLInputElement | null;
 
 // ─── State ────────────────────────────────────────────────────────────────────
 let storedId: string | undefined;
@@ -254,7 +277,7 @@ async function sendMessage() {
 // ─── Saved chats (sidebar) ────────────────────────────────────────────────────
 async function loadSavedChats() {
     try {
-        const res = await fetch(`${BACKEND_SESSION_URL}/${getSessionId()}`);
+        const res = await fetch(`${BACKEND_SESSION_URL}/user/${encodeURIComponent(_currentUser.login)}`);
         if (!res.ok) return;
         const chats: SavedChat[] = await res.json();
         renderSidebarChats(chats);
@@ -283,14 +306,19 @@ function renderSidebarChats(chats: SavedChat[]) {
         item.innerHTML = `
             <span class="sidebar__chat-item__icon">${chatIconSVG}</span>
             <span class="sidebar__chat-item__title" title="${escapeHtml(chat.title)}">${escapeHtml(chat.title)}</span>
-            <button class="sidebar__chat-item__delete" data-chat-id="${chat.id}" data-chat-title="${escapeHtml(chat.title)}" aria-label="Deletar chat">
-                ${trashIconSVG}
-            </button>
+            <div class="sidebar__chat-item__actions">
+                <button class="sidebar__chat-item__edit" data-chat-id="${chat.id}" data-chat-title="${escapeHtml(chat.title)}" aria-label="Renomear consulta">
+                    ${editIconSVG}
+                </button>
+                <button class="sidebar__chat-item__delete" data-chat-id="${chat.id}" data-chat-title="${escapeHtml(chat.title)}" aria-label="Deletar consulta">
+                    ${trashIconSVG}
+                </button>
+            </div>
         `;
 
         // Clique no item: carrega o chat
         item.addEventListener("click", (e) => {
-            if ((e.target as HTMLElement).closest(".sidebar__chat-item__delete")) return;
+            if ((e.target as HTMLElement).closest(".sidebar__chat-item__actions")) return;
             loadChat(chat);
         });
 
@@ -312,9 +340,18 @@ function updateActiveSidebarItem(chatId: string | null) {
     });
 }
 
-function loadChat(chat: SavedChat) {
+async function loadChat(chat: SavedChat) {
     clearChat();
     activeChatId = chat.id;
+    storedId = chat.session_id; // reutiliza a session_id da conversa
+
+    // Sincroniza/reseta a memória ativa no backend para o histórico salvo,
+    // descartando quaisquer mensagens não salvas que existissem na memória.
+    try {
+        await fetch(`${BACKEND_SESSION_URL}/${chat.id}/sync`, { method: "POST" });
+    } catch {
+        // ignora erros de sync se servidor falhar
+    }
 
     // Repopula o histórico visualmente
     for (const entry of chat.history) {
@@ -327,7 +364,51 @@ function loadChat(chat: SavedChat) {
     closeSidebar();
 }
 
-async function saveCurrentChat() {
+function handleSaveButtonClick() {
+    if (chatMessages.length === 0) {
+        showToast("Nenhuma mensagem para salvar.", "error");
+        return;
+    }
+
+    const saveWarningKey = `galeno_hide_save_warning_${_currentUser.login}`;
+    const hideWarning = localStorage.getItem(saveWarningKey);
+    if (hideWarning === "true") {
+        executeSaveChat();
+    } else {
+        openSaveConfirmModal();
+    }
+}
+
+function openSaveConfirmModal() {
+    if (!saveConfirmModal) {
+        executeSaveChat();
+        return;
+    }
+    if (dontShowSaveWarningCb) dontShowSaveWarningCb.checked = false;
+    saveConfirmModal.classList.remove("hidden");
+}
+
+function closeSaveConfirmModalHandler() {
+    if (!saveConfirmModal) return;
+    saveConfirmModal.classList.add("hidden");
+}
+
+closeSaveConfirmModal?.addEventListener("click", closeSaveConfirmModalHandler);
+cancelSaveConfirmModal?.addEventListener("click", closeSaveConfirmModalHandler);
+saveConfirmModal?.addEventListener("click", (e) => {
+    if (e.target === saveConfirmModal) closeSaveConfirmModalHandler();
+});
+
+confirmSaveBtn?.addEventListener("click", () => {
+    if (dontShowSaveWarningCb?.checked) {
+        const saveWarningKey = `galeno_hide_save_warning_${_currentUser.login}`;
+        localStorage.setItem(saveWarningKey, "true");
+    }
+    closeSaveConfirmModalHandler();
+    executeSaveChat();
+});
+
+async function executeSaveChat() {
     if (chatMessages.length === 0) {
         showToast("Nenhuma mensagem para salvar.", "error");
         return;
@@ -340,7 +421,11 @@ async function saveCurrentChat() {
         const res = await fetch(BACKEND_SESSION_URL, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ session_id: getSessionId() }),
+            body: JSON.stringify({
+                session_id: getSessionId(),
+                user_login: _currentUser.login,
+                chat_id: activeChatId || undefined,
+            }),
         });
 
         if (!res.ok) {
@@ -362,8 +447,6 @@ async function saveCurrentChat() {
 }
 
 async function deleteChat(chatId: string, title: string) {
-    if (!confirm(`Deletar a consulta "${title}"? Esta ação não pode ser desfeita.`)) return;
-
     try {
         const res = await fetch(`${BACKEND_SESSION_URL}/${chatId}`, { method: "DELETE" });
         if (!res.ok) throw new Error(`Erro ${res.status}`);
@@ -377,13 +460,150 @@ async function deleteChat(chatId: string, title: string) {
     }
 }
 
-// Delegação de eventos para botões de delete na sidebar
+// ─── Modal de Renomear Consulta ───────────────────────────────────────────────
+const renameModal          = document.getElementById("rename-chat-modal") as HTMLElement | null;
+const renameInput          = document.getElementById("rename-input") as HTMLInputElement | null;
+const closeRenameModal     = document.getElementById("close-rename-modal");
+const cancelRenameModal    = document.getElementById("cancel-rename-modal");
+const confirmRenameBtn     = document.getElementById("confirm-rename-btn");
+
+let _renameChatId: string | null = null;
+
+function openRenameModal(chatId: string, currentTitle: string) {
+    if (!renameModal || !renameInput) return;
+    _renameChatId = chatId;
+    renameInput.value = currentTitle;
+    renameModal.classList.remove("hidden");
+    // Seleciona o texto do input para facilitar edição
+    setTimeout(() => { renameInput.focus(); renameInput.select(); }, 80);
+}
+
+function closeRenameModalHandler() {
+    if (!renameModal) return;
+    renameModal.classList.add("hidden");
+    _renameChatId = null;
+}
+
+closeRenameModal?.addEventListener("click", closeRenameModalHandler);
+cancelRenameModal?.addEventListener("click", closeRenameModalHandler);
+renameModal?.addEventListener("click", (e) => {
+    if (e.target === renameModal) closeRenameModalHandler();
+});
+
+renameInput?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") confirmRenameBtn?.click();
+    if (e.key === "Escape") closeRenameModalHandler();
+});
+
+confirmRenameBtn?.addEventListener("click", async () => {
+    if (!_renameChatId || !renameInput) return;
+    const trimmed = renameInput.value.trim();
+    if (!trimmed) {
+        showToast("O nome da consulta não pode ser vazio.", "error");
+        renameInput.focus();
+        return;
+    }
+    const chatId = _renameChatId;
+    closeRenameModalHandler();
+    try {
+        const res = await fetch(`${BACKEND_SESSION_URL}/${chatId}/title`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ title: trimmed }),
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({ detail: res.statusText }));
+            throw new Error(err.detail || `Erro ${res.status}`);
+        }
+        showToast("Consulta renomeada!");
+        await loadSavedChats();
+    } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        showToast(`Erro ao renomear: ${msg}`, "error");
+    }
+}
+);
+
+function renameChat(chatId: string, currentTitle: string) {
+    openRenameModal(chatId, currentTitle);
+}
+
+// Delegação de eventos para botões de editar e deletar na sidebar
 sidebarChats.addEventListener("click", (e) => {
-    const btn = (e.target as HTMLElement).closest(".sidebar__chat-item__delete") as HTMLElement | null;
-    if (!btn) return;
-    const chatId = btn.dataset.chatId!;
-    const title = btn.dataset.chatTitle || "consulta";
-    deleteChat(chatId, title);
+    const editBtn = (e.target as HTMLElement).closest(".sidebar__chat-item__edit") as HTMLElement | null;
+    if (editBtn) {
+        e.stopPropagation();
+        const chatId = editBtn.dataset.chatId!;
+        const title = editBtn.dataset.chatTitle || "";
+        renameChat(chatId, title);
+        return;
+    }
+
+    const deleteBtn = (e.target as HTMLElement).closest(".sidebar__chat-item__delete") as HTMLElement | null;
+    if (deleteBtn) {
+        e.stopPropagation();
+        const chatId = deleteBtn.dataset.chatId!;
+        const title = deleteBtn.dataset.chatTitle || "consulta";
+        deleteChat(chatId, title);
+        return;
+    }
+});
+
+// ─── Modal de Alteração de Senha ──────────────────────────────────────────────
+function openPasswordModal() {
+    if (!changePasswordModal) return;
+    changePasswordForm?.reset();
+    changePasswordModal.classList.remove("hidden");
+}
+
+function closePasswordModalHandler() {
+    if (!changePasswordModal) return;
+    changePasswordModal.classList.add("hidden");
+}
+
+closePasswordModal?.addEventListener("click", closePasswordModalHandler);
+cancelPasswordModal?.addEventListener("click", closePasswordModalHandler);
+changePasswordModal?.addEventListener("click", (e) => {
+    if (e.target === changePasswordModal) closePasswordModalHandler();
+});
+
+changePasswordForm?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const oldPass = oldPasswordInput?.value || "";
+    const newPass = newPasswordInput?.value || "";
+    const confirmPass = confirmPasswordInput?.value || "";
+
+    if (newPass !== confirmPass) {
+        showToast("As senhas não coincidem.", "error");
+        return;
+    }
+    if (newPass.length < 6) {
+        showToast("A nova senha deve ter no mínimo 6 caracteres.", "error");
+        return;
+    }
+
+    try {
+        const res = await fetch(BACKEND_CHANGE_PASSWORD_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                login: _currentUser.login,
+                old_password: oldPass,
+                new_password: newPass,
+            }),
+        });
+
+        if (!res.ok) {
+            const errData = await res.json().catch(() => ({ detail: "Erro ao alterar senha." }));
+            throw new Error(errData.detail || "Erro ao alterar senha.");
+        }
+
+        showToast("Senha alterada com sucesso!");
+        closePasswordModalHandler();
+    } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        showToast(msg, "error");
+    }
 });
 
 // ─── Event listeners ──────────────────────────────────────────────────────────
@@ -400,22 +620,39 @@ newChatBtn.addEventListener("click", () => {
     closeSidebar();
 });
 
-saveChatBtn.addEventListener("click", saveCurrentChat);
+saveChatBtn.addEventListener("click", handleSaveButtonClick);
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 function init() {
     initDeviceDetection();
     loadSavedChats();
 
-    // Exibir nome do usuário logado no header
+    // Exibir nome do aluno no título do header e "Online" no status (ao lado do ponto verde)
+    const headerTitle = document.querySelector(".chat-app__header-title") as HTMLElement | null;
+    if (headerTitle && _currentUser?.name) {
+        headerTitle.textContent = _currentUser.name;
+    }
     const headerStatus = document.querySelector(".chat-app__header-status") as HTMLElement | null;
-    if (headerStatus && _currentUser?.name) {
-        headerStatus.textContent = _currentUser.name;
+    if (headerStatus) {
+        headerStatus.textContent = "Online";
     }
 
-    // Botão de logout na sidebar footer
+    // Botões na sidebar footer
     const sidebarFooter = document.querySelector(".sidebar__footer") as HTMLElement | null;
     if (sidebarFooter) {
+        // Botão de alteração de senha
+        const changePassBtn = document.createElement("button");
+        changePassBtn.className = "sidebar__password-btn";
+        changePassBtn.innerHTML = `
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+            Alterar senha`;
+        changePassBtn.addEventListener("click", openPasswordModal);
+        sidebarFooter.prepend(changePassBtn);
+
+        // Botão de logout
         const logoutBtn = document.createElement("button");
         logoutBtn.className = "sidebar__logout-btn";
         logoutBtn.innerHTML = `
@@ -429,7 +666,7 @@ function init() {
             sessionStorage.removeItem("galeno_user");
             window.location.replace("/login.html");
         });
-        sidebarFooter.prepend(logoutBtn);
+        sidebarFooter.appendChild(logoutBtn);
     }
 }
 
