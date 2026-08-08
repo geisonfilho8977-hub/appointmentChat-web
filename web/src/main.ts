@@ -248,7 +248,11 @@ async function sendMessage() {
     const typingIndicator = showTypingIndicator();
 
     try {
-        const payload = { session_id: getSessionId(), message: userMessage };
+        const payload = {
+            session_id: getSessionId(),
+            message: userMessage,
+            user_login: _currentUser.login,
+        };
         const response = await fetch(BACKEND_CHAT_URL, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
