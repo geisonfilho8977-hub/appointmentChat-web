@@ -80,4 +80,4 @@ appointmentChat-web/
 
 ## 🐳 Conteinerização com Docker
 
-O frontend está pronto para rodar conteinerizado via `docker-compose.yml` na raiz do projeto. Consulte [`DEPLOY_DOCKER.md`](../DEPLOY_DOCKER.md) para instrução de implantação.
+O frontend está pronto para rodar conteinerizado via `docker-compose.yml` na raiz do projeto.
